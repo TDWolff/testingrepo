@@ -27,46 +27,36 @@ if user_input.lower() == "new" or user_input.lower() == "n":
     cap.release()
     cv2.destroyAllWindows()
 else:
-    # Load the images from the training folder
-    data_folder_path = '/Users/torinwolff/Documents/GitHub/testingrepo/facialrecog/training/TorinWolff'
-    face_images = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path) if os.path.isfile(os.path.join(data_folder_path, f))]
-
-    # Create a dictionary to store the identities
-    identities = {}
-
-    for image_path in face_images:
-        identity = os.path.splitext(os.path.basename(image_path))[0]
-        identities[identity] = image_path
-
     # Capture a new image from the webcam
     cap = cv2.VideoCapture(0)
+    print("Look at the camera...")
     ret, frame = cap.read()
-
-    # Increase the brightness
-    frame = cv2.convertScaleAbs(frame, alpha=1, beta=50)
-
-    cv2.imshow('Captured Image', frame)
-    cv2.waitKey(1000)  # waits for 1000 ms
-    cv2.destroyAllWindows()
-
-    new_image_path = "/Users/torinwolff/Documents/GitHub/testingrepo/facialrecog/faces/new_image.jpg"
+    new_image_path = "/Users/torinwolff/Documents/GitHub/testingrepo/facialrecog/new_image.jpg"
     cv2.imwrite(new_image_path, frame)
     cap.release()
 
-    # Initialize a counter
-    true_counter = 0
+    # Load the images from the training folder and its subfolders
+    data_folder_path = '/Users/torinwolff/Documents/GitHub/testingrepo/facialrecog/training'
+    for root, dirs, files in os.walk(data_folder_path):
+        face_images = [os.path.join(root, file) for file in files if file.endswith((".jpg", ".png"))]  # add more file types if needed
+        if not face_images:  # skip if no images in the folder
+            continue
 
-    for identity, db_img_path in identities.items():
-        print(f"Verifying {identity}...")
-        result = DeepFace.verify(new_image_path, db_img_path, model_name = "Facenet", enforce_detection = False)
-        print(f"Is {identity} verified: ", result["verified"])
+        # Initialize a counter
+        true_counter = 0
 
-        # Increment the counter if the verification result is True
-        if result["verified"]:
-            true_counter += 1
+        for image_path in face_images:
+            print(f"Verifying {image_path}...")
+            result = DeepFace.verify(new_image_path, image_path, model_name = "Facenet", enforce_detection = False)
+            print(f"Is {image_path} verified: ", result["verified"])
 
-    # Check if the counter is 2 or more
-    if true_counter >= 2:
-        print("It's the right person!")
+            # Increment the counter if the verification result is True
+            if result["verified"]:
+                true_counter += 1
+
+        # Check if the counter is 2 or more
+        if true_counter >= 2:
+            print(f"It's the right person, Welcome {os.path.basename(root)}!")
+            break
     else:
         print("It's not the right person.")
