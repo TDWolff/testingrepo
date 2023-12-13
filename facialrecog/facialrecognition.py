@@ -1,81 +1,72 @@
-import face_recognition
+from deepface import DeepFace
 import os
 import cv2
+import numpy as np
+import time
 
-# Load the images from the training folder
-data_folder_path = '/path/to/your/training/folder'
-face_images = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path) if os.path.isfile(os.path.join(data_folder_path, f))]
+user_input = input("Do you want to register a new face (New/N) or recognize a face (Rec/R)? ")
 
-# Learn how to recognize each image
-your_face_encodings = []
-for image_path in face_images:
-    your_image = face_recognition.load_image_file(image_path)
-    your_face_encodings.append(face_recognition.face_encodings(your_image)[0])
+if user_input.lower() == "new" or user_input.lower() == "n":
+    print("Registering a new face...")
+    # Capture a new image from the webcam
+    cap = cv2.VideoCapture(0)
+    user_name = input("Enter your name: ")
+    new_folder_path = f"/Users/torinwolff/Documents/GitHub/testingrepo/facialrecog/training/{user_name}"
+    if not os.path.exists(new_folder_path):
+        os.makedirs(new_folder_path)
+    i = 1
+    print("Look at the camera...")
+    while i <= 20:  # capture 20 images
+        ret, frame = cap.read()
+        cv2.imshow('Capturing Image', frame)
+        if i % 2 == 0:  # capture an image every other iteration
+            cv2.imwrite(f"{new_folder_path}/{user_name} ({i//2}).jpg", frame)
+        if cv2.waitKey(500) & 0xFF == ord('q'):  # wait 500 ms between images
+            break
+        i += 1
+    cap.release()
+    cv2.destroyAllWindows()
+else:
+    # Load the images from the training folder
+    data_folder_path = '/Users/torinwolff/Documents/GitHub/testingrepo/facialrecog/training/TorinWolff'
+    face_images = [os.path.join(data_folder_path, f) for f in os.listdir(data_folder_path) if os.path.isfile(os.path.join(data_folder_path, f))]
 
-# Initialize variables
-face_locations = []
-face_encodings = []
-face_names = []
-process_this_frame = True
+    # Create a dictionary to store the identities
+    identities = {}
 
-while True:
-    # Grab a single frame of video
-    ret, frame = cv2.VideoCapture.read()
+    for image_path in face_images:
+        identity = os.path.splitext(os.path.basename(image_path))[0]
+        identities[identity] = image_path
 
-    # Resize frame of video to 1/4 size for faster face recognition processing
-    small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+    # Capture a new image from the webcam
+    cap = cv2.VideoCapture(0)
+    ret, frame = cap.read()
 
-    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-    rgb_small_frame = small_frame[:, :, ::-1]
+    # Increase the brightness
+    frame = cv2.convertScaleAbs(frame, alpha=1, beta=50)
 
-    # Only process every other frame of video to save time
-    if process_this_frame:
-        # Find all the faces and face encodings in the current frame of video
-        face_locations = face_recognition.face_locations(rgb_small_frame)
-        face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+    cv2.imshow('Captured Image', frame)
+    cv2.waitKey(1000)  # waits for 1000 ms
+    cv2.destroyAllWindows()
 
-        face_names = []
-        for face_encoding in face_encodings:
-            # See if the face is a match for the known face(s)
-            matches = face_recognition.compare_faces(your_face_encodings, face_encoding)
-            name = "Unknown"
+    new_image_path = "/Users/torinwolff/Documents/GitHub/testingrepo/facialrecog/faces/new_image.jpg"
+    cv2.imwrite(new_image_path, frame)
+    cap.release()
 
-            if True in matches:
-                name = "Torin Wolff"
+    # Initialize a counter
+    true_counter = 0
 
-            face_names.append(name)
+    for identity, db_img_path in identities.items():
+        print(f"Verifying {identity}...")
+        result = DeepFace.verify(new_image_path, db_img_path, model_name = "Facenet", enforce_detection = False)
+        print(f"Is {identity} verified: ", result["verified"])
 
-    process_this_frame = not process_this_frame
+        # Increment the counter if the verification result is True
+        if result["verified"]:
+            true_counter += 1
 
-    # Display the results
-    for (top, right, bottom, left), name in zip(face_locations, face_names):
-        # Scale back up face locations since the frame we detected in was scaled to 1/4 size
-        top *= 4
-        right *= 4
-        bottom *= 4
-        left *= 4
-
-        # Draw a box around the face
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-
-        # Draw a label with a name below the face
-        cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-        font = cv2.FONT_HERSHEY_DUPLEX
-        cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
-
-            # Display the resulting image
-        cv2.imshow('Video', frame)
-
-    # Hit 'q' on the keyboard to quit!
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Release handle to the webcam
-# Define the video capture object
-video_capture = cv2.VideoCapture(0)
-
-# ... your existing code ...
-
-# Release handle to the webcam
-video_capture.release()
-cv2.destroyAllWindows()
+    # Check if the counter is 2 or more
+    if true_counter >= 2:
+        print("It's the right person!")
+    else:
+        print("It's not the right person.")
